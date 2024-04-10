@@ -13,14 +13,19 @@ export default () => {
         value = value.trim()
         if (value == '') return data
 
-        const filteredData = data.filter(record => {
-            return Object.keys(record).some(key =>
-                String(record[key])
-                    .toLowerCase()
-                    .includes(value.toLowerCase()),
-            )
-        })
+        const filteredData = data.filter((record) => {
+          return Object.keys(record).some((key) => {
+            if (Array.isArray(record[key])) {
+              record[key] = performSearch(record[key], value);
+              return record[key].length;
+            }
 
+            return String(record[key])
+              .toLowerCase()
+              .includes(value.toLowerCase());
+          });
+        });
+        
         return filteredData
     }
 }
