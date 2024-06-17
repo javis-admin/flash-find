@@ -11,11 +11,10 @@ class FlashFind {
 
     constructor(dataSource) {
         if (!FlashFind.instance) {
-            this.#dataSource = dataSource;
-
             FlashFind.instance = this;
         }
 
+        FlashFind.instance.#dataSource = dataSource;
         return FlashFind.instance;
     }
 
