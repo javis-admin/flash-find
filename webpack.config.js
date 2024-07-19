@@ -6,7 +6,13 @@ module.exports = {
   output: {
     filename: "bundle.js",
     path: path.resolve(__dirname, "dist"),
-    publicPath: "/dist/",
+    clean: true,
+    publicPath: '/',
+    library: {
+      name: 'FlashFind',
+      type: "umd",
+      export: "default",
+    },
   },
   module: {
     rules: [
@@ -20,13 +26,13 @@ module.exports = {
           },
         },
       },
-      {
-        test: /\.worker\.js$/,
-        use: {
-          loader: "worker-loader",
-          options: { inline: "no-fallback" },
-        },
-      },
+      // {
+      //   test: /\.worker\.js$/,
+      //   use: {
+      //     loader: "worker-loader",
+      //     options: { inline: "fallback" },
+      //   },
+      // },
     ],
   },
   resolve: {
