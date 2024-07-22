@@ -1,5 +1,5 @@
 {
-  "name": "@local/flash-find",
+  "name": "@okjavis/flash-find",
   "version": "1.1.0",
   "description": "blazing fast client-side search utility",
   "main": "dist/bundle.js",
