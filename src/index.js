@@ -10,7 +10,6 @@ class FlashFind {
     #dataSource = null;
 
     constructor(dataSource) {
-        console.log("PRASHANT");
         if (!FlashFind.instance) {
             FlashFind.instance = this;
         }
