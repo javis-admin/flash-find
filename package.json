@@ -1,8 +1,8 @@
 {
-  "name": "@okjavis/flash-find",
+  "name": "@local/flash-find",
   "version": "1.1.1",
   "description": "blazing fast client-side search utility",
-  "main": "dist/bundle.js",
+  "main": "src/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack"
