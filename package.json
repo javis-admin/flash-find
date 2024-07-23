@@ -1,6 +1,6 @@
 {
-  "name": "@local/flash-find",
-  "version": "1.1.1",
+  "name": "@okjavis/flash-find",
+  "version": "1.1.2",
   "description": "blazing fast client-side search utility",
   "main": "src/index.js",
   "scripts": {
