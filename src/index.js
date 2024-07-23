@@ -8,13 +8,15 @@ class FlashFind {
     #searchResult = [];
     //   #workerScript = worker;
     #dataSource = null;
+    fuseConfig = {}
 
-    constructor(dataSource) {
+    constructor(dataSource, fuseConfig = {}) {
         if (!FlashFind.instance) {
             FlashFind.instance = this;
         }
 
         FlashFind.instance.#dataSource = dataSource;
+        FlashFind.instance.fuseConfig = fuseConfig;
         return FlashFind.instance;
     }
 
@@ -40,8 +42,7 @@ class FlashFind {
      * @param {function} callback - A function to be called to fetch the search results.
      */
     #handleMessage(event, callback) {
-        const searchedRecords = event.data;
-
+        const searchedRecords = event.data ? event.data : [];
         this.#threadSyncFlag += 1;
         if (this.#threadSyncFlag === 1) {
             this.#searchResult = [...searchedRecords];
@@ -101,6 +102,7 @@ class FlashFind {
             workerThread.postMessage({
                 record: this.#dataChunks[idx],
                 searchText: `${query}`,
+                fuseConfig: this.fuseConfig
             });
 
             workerThread.addEventListener("message", () => {
