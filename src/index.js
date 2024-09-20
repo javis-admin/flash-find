@@ -17,9 +17,8 @@ class FlashFind {
         //     FlashFind.instance = this;
         // }
 
-        FlashFind.instance.#dataSource = dataSource;
-        FlashFind.instance.fuseConfig = fuseConfig;
-        return FlashFind.instance;
+        this.#dataSource = dataSource;
+        this.fuseConfig = fuseConfig;
     }
 
     /**
