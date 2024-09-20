@@ -11,13 +11,14 @@ class FlashFind {
     fuseConfig = {}
 
     constructor(dataSource, fuseConfig = {}) {
-        if (!FlashFind.instance) {
-            FlashFind.instance = this;
-        }
 
-        FlashFind.instance.#dataSource = dataSource;
-        FlashFind.instance.fuseConfig = fuseConfig;
-        return FlashFind.instance;
+        // singleton instance
+        // if (!FlashFind.instance) {
+        //     FlashFind.instance = this;
+        // }
+
+        this.#dataSource = dataSource;
+        this.fuseConfig = fuseConfig;
     }
 
     /**
