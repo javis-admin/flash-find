@@ -51,7 +51,12 @@ class FlashFind {
             this.#searchResult = [...this.#searchResult, ...searchedRecords];
         }
 
+        // Check if all workers have finished
         if (this.#threadSyncFlag === navigator.hardwareConcurrency) {
+            // Sort the search result based on the 'score' property (lower score means higher relevancy)
+            this.#searchResult.sort((a, b) => (a.flashScore || 1) - (b.flashScore || 1));
+
+            // Return the sorted result
             callback(this.#searchResult);
         }
     }

@@ -23,17 +23,18 @@ export default () => {
         if (!data || data.length == 0) return;
 
         const config =
-          Object.keys(fuseConfig).length > 0
-            ? fuseConfig
-            : {
-                // shouldSort: true,
-                threshold: 0.3,
-                location: 0,
-                distance: 100,
-                maxPatternLength: 32,
-                // minMatchCharLength: 1,
-                keys: Object.keys(data[0]), // Extract key names from data object
-              };
+            Object.keys(fuseConfig).length > 0
+                ? fuseConfig
+                : {
+                    // shouldSort: true,
+                    threshold: 0.3,
+                    location: 0,
+                    distance: 100,
+                    maxPatternLength: 32,
+                    includeScore: true,
+                    // minMatchCharLength: 1,
+                    keys: Object.keys(data[0]), // Extract key names from data object
+                };
 
         const fuseInstance = new Fuse(data, config);
 
@@ -42,7 +43,10 @@ export default () => {
         }
         const filteredData = fuseInstance.search(value);
 
-        return filteredData.map((res) => res.item);
+        return filteredData.map((res) => ({
+            ...res.item,
+            flashScore: res.score 
+        }));
     };
 
     const performSearchFallback = (data, value) => {
