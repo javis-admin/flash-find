@@ -8,6 +8,7 @@ class FlashFind {
     #searchResult = [];
     //   #workerScript = worker;
     #dataSource = null;
+    #callback = undefined;
     fuseConfig = {}
 
     constructor(dataSource, fuseConfig = {}) {
@@ -27,6 +28,7 @@ class FlashFind {
      */
     init(callback) {
         this.#workerPool = [];
+        this.#callback = callback;
         for (let i = 0; i < navigator.hardwareConcurrency; i++) {
             const workerThread = new WebWorker(worker);
             this.#workerPool.push(workerThread);
@@ -89,6 +91,12 @@ class FlashFind {
     search(query) {
         this.#threadSyncFlag = 0;
         this.#searchResult = [];
+
+        // If query is an empty string, return dataSource as it is
+        if (query?.trim() === '') {
+            this.#callback(this.#dataSource)
+            return
+        }
 
         const taskQueue = [];
 
