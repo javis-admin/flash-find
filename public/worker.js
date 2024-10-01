@@ -18,7 +18,6 @@ export default () => {
     });
 
     const performSearch = (data, value, fuseConfig) => {
-        console.log('vv: ', value)
         value = value?.trim();
         if (!data || data.length == 0) return;
 
