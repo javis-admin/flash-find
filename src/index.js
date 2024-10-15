@@ -39,6 +39,11 @@ class FlashFind {
         this.#dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource);
     }
 
+    updateDataSource(dataSource) { 
+        this.#dataSource = dataSource;
+        this.#dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource);
+    }
+
     /**
      * Handles incoming messages from worker threads.
      * @param {MessageEvent} event - The incoming message from the worker thread.
@@ -94,6 +99,7 @@ class FlashFind {
 
         // If query is an empty string, return dataSource as it is
         if (query?.trim() === '') {
+            console.log("@flash-find: data",this.#dataSource)
             this.#callback(this.#dataSource)
             return
         }
