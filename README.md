@@ -1,67 +1,107 @@
-# Flash Find ⚡: Parallel Search Optimization with Web Workers
+Here’s the updated documentation with details on Fuse.js integration and configurable fuzzy search:
 
-This project addresses the performance challenges associated with client-side search operations as the dataset grows or when using complex search algorithms. 
-In scenarios where traditional approaches fail to provide satisfactory performance, this project offers a solution by leveraging web workers for parallel processing.
+---
+
+# FlashFind ⚡: Parallel Search Optimization with Web Workers
+
+FlashFind is a high-performance library that uses web workers to efficiently perform parallel searches on large datasets. It leverages Fuse.js for powerful fuzzy search capabilities, allowing for customizable search behavior tailored to your specific needs.
 
 ## Problem Statement
 
-You have a client-side search implemented using various search algorithms, which performs well initially. However, as your dataset grows or when dealing with more complex search requirements, performance begins to degrade. 
-Tweaking search options can only provide marginal improvements, and attempts to enhance user experience through techniques like input debouncing prove insufficient. 
-Eventually, the application freezes or becomes unresponsive during search operations, resulting in a degraded user experience.
-
-You are reluctant to abandon search functionality or migrate the client-side search to the server, as these solutions would compromise the user experience or introduce additional complexity and latency. 
-Instead, you seek a solution that allows for efficient client-side search processing without blocking the main thread or sacrificing search capabilities.
+When handling large datasets, client-side searches can suffer from performance issues, leading to slow responses or application freezes. Common optimizations such as debouncing and simpler search algorithms can only go so far before the main thread becomes overloaded. FlashFind tackles this problem by distributing search tasks across multiple web workers, leveraging the full power of the user's CPU cores for parallel processing.
 
 ## Solution
 
-This project offers a solution by utilizing web workers for parallel processing of search tasks. 
-By distributing search operations among multiple worker threads, the application can leverage the computational resources of modern multi-core processors more effectively. 
-This approach allows for faster search performance without blocking the main thread or compromising search capabilities.
+FlashFind splits your dataset into chunks, each processed by a separate web worker. It integrates Fuse.js to enable advanced fuzzy searching, and lets you customize the search logic through Fuse.js configuration options. This parallelized approach enables faster search performance and ensures that the main thread remains responsive, even during complex searches.
 
 ## Features
 
-- Utilizes web workers to perform search tasks in parallel.
-- Dynamically estimates the number of logical cores available on the user's machine.
-- Splits the search data into chunks based on the number of available logical cores.
-- Distributes search tasks among worker threads for concurrent execution.
-- Aggregates search results from multiple worker threads to generate the final result.
-
+- **Parallel Search Processing**: Uses web workers to handle search tasks concurrently.
+- **Fuse.js Integration**: Incorporates Fuse.js to provide flexible and powerful fuzzy search options.
+- **Dynamic Thread Allocation**: Adapts to the number of CPU cores available, ensuring optimal performance across different devices.
+- **Chunk-Based Data Processing**: Divides the dataset into manageable chunks for efficient worker thread processing.
+- **Aggregated Results**: Collects and sorts results from all worker threads to ensure a unified and relevant search output.
 
 ## Installation
-  You can install Flash Find via npm: https://www.npmjs.com/package/thunder-search?activeTab=readme
-  
-  ```bash
-  npm install flash-find
-  ```
-  ### Usage
-  ```javascript
-  import FlashFind from 'flash-find';
-  
-  // Define your data source and callback function
-  const dataSource = [...]; // Your data source
-  const callback = (result) => { console.log(result); }; // Callback function to handle search results
-  
-  // Initialize FlashFind
-  const flash = new FlashFind(dataSource);
-  
-  // Initialize FlashFind and perform initialization
-  flash.init(callback);
-  
-  // Perform search
-  flash.search("query");
-  ```
 
-  ### Features
-  
-  * Lightning-Fast Performance: FlashFind harnesses the power of web workers to execute search operations in parallel, ensuring blazingly fast performance.
-  * Scalable: Designed to handle large datasets and complex search requirements, FlashFind offers scalable search capabilities for diverse applications.
-  
-  ### Contributing
-  Contributions are welcome! Please feel free to submit bug reports, feature requests, or pull requests via the GitHub repository.
-  
-  ### License
-  This project is licensed under the MIT License - see the LICENSE file for details.
+To install FlashFind via npm:
 
+```bash
+npm install flash-find
+```
 
+## Usage
 
+### Import and Initialize
 
+```javascript
+import FlashFind from 'flash-find';
+
+// Define your data source, optional Fuse.js configuration, and a callback function to handle search results
+const dataSource = [...]; // Your data source
+const fuseConfig = { keys: ["title", "author"], threshold: 0.3 }; // Custom Fuse.js configuration
+const callback = (results) => { console.log(results); };
+
+// Initialize FlashFind with your data source and optional Fuse.js configuration
+const flashFind = new FlashFind(dataSource, fuseConfig);
+
+// Initialize the worker pool and prepare for search operations
+flashFind.init(callback);
+```
+
+### Perform a Search
+
+Use the `search` method to perform a search with the desired query:
+
+```javascript
+// Perform search with a query
+flashFind.search("your search query");
+```
+
+### Update Data Source
+
+To update the data source dynamically:
+
+```javascript
+// Update the data source
+flashFind.updateDataSource(newDataSource);
+```
+
+## API Documentation
+
+### `FlashFind(dataSource, fuseConfig)`
+
+Creates a new FlashFind instance.
+
+- **dataSource**: Array of data to be searched.
+- **fuseConfig**: (Optional) Configuration object for Fuse.js to customize search behavior. You can adjust settings like threshold, distance, and keys to tailor the fuzzy search logic.
+
+### `.init(callback)`
+
+Initializes the worker pool and prepares the library for searching. Should be called before performing searches.
+
+- **callback**: Function to handle the search results.
+
+### `.search(query)`
+
+Performs a search operation for the specified query.
+
+- **query**: The query string to search for.
+
+### `.updateDataSource(dataSource)`
+
+Updates the data source and re-chunks it for worker processing.
+
+- **dataSource**: The new data to be searched.
+
+## Contributing
+
+We welcome contributions! Please open an issue or submit a pull request on our [GitHub repository](https://github.com/your-repo-link).
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for more details.
+
+---
+
+This version highlights the Fuse.js integration, allowing users to easily understand how to configure and leverage fuzzy search within FlashFind.
