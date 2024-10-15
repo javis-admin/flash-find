@@ -99,7 +99,6 @@ class FlashFind {
 
         // If query is an empty string, return dataSource as it is
         if (query?.trim() === '') {
-            console.log("@flash-find: data",this.#dataSource)
             this.#callback(this.#dataSource)
             return
         }
