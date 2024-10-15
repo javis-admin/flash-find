@@ -39,6 +39,11 @@ class FlashFind {
         this.#dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource);
     }
 
+    updateDataSource(dataSource) { 
+        this.#dataSource = dataSource;
+        this.#dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource);
+    }
+
     /**
      * Handles incoming messages from worker threads.
      * @param {MessageEvent} event - The incoming message from the worker thread.
