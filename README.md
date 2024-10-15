@@ -1,4 +1,6 @@
-# FlashFind ⚡: Parallel Search Optimization with Web Workers
+# FlashFind ⚡: Parallel Search Optimization with Web Workers 
+
+NPM: https://www.npmjs.com/package/@okjavis/flash-find
 
 FlashFind is a high-performance library that uses web workers to efficiently perform parallel searches on large datasets. It leverages Fuse.js for powerful fuzzy search capabilities, allowing for customizable search behavior tailored to your specific needs.
 
