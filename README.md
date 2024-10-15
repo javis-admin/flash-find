@@ -1,7 +1,3 @@
-Here’s the updated documentation with details on Fuse.js integration and configurable fuzzy search:
-
----
-
 # FlashFind ⚡: Parallel Search Optimization with Web Workers
 
 FlashFind is a high-performance library that uses web workers to efficiently perform parallel searches on large datasets. It leverages Fuse.js for powerful fuzzy search capabilities, allowing for customizable search behavior tailored to your specific needs.
