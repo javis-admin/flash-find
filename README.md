@@ -102,4 +102,3 @@ This project is licensed under the MIT License. See the LICENSE file for more de
 
 ---
 
-This version highlights the Fuse.js integration, allowing users to easily understand how to configure and leverage fuzzy search within FlashFind.
