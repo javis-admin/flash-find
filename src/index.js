@@ -2,88 +2,61 @@ import WebWorker from "./WebWorker";
 import worker from "../public/worker";
 
 class FlashFind {
-    #workerPool = [];
-    #dataChunks = [];
-    #threadSyncFlag = 0;
-    #searchResult = [];
-    //   #workerScript = worker;
     #dataSource = null;
     #callback = undefined;
+    #activeWorkers = new Set();
+    #isSearching = false;
     fuseConfig = {}
 
     constructor(dataSource, fuseConfig = {}) {
-
-        // singleton instance
-        // if (!FlashFind.instance) {
-        //     FlashFind.instance = this;
-        // }
-
         this.#dataSource = dataSource;
         this.fuseConfig = fuseConfig;
     }
 
     /**
-     * Initializes the worker pool and data chunks.
+     * Initializes the callback for search results.
      * @param {function} callback - A function to be called to fetch the search results.
      */
     init(callback) {
-        this.#workerPool = [];
         this.#callback = callback;
-        for (let i = 0; i < navigator.hardwareConcurrency; i++) {
-            const workerThread = new WebWorker(worker);
-            this.#workerPool.push(workerThread);
-            workerThread.addEventListener("message", (event) =>
-                this.#handleMessage(event, callback)
-            );
-        }
-        this.#dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource);
+        // Clean up any existing workers
+        this.#terminateAllWorkers();
     }
 
-    updateDataSource(dataSource) { 
+    updateDataSource(dataSource) {
         this.#dataSource = dataSource;
-        this.#dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource);
+        // Terminate any active workers when data source changes
+        this.#terminateAllWorkers();
     }
 
     /**
-     * Handles incoming messages from worker threads.
-     * @param {MessageEvent} event - The incoming message from the worker thread.
-     * @param {function} callback - A function to be called to fetch the search results.
+     * Terminates all active workers and clears the active workers set.
      */
-    #handleMessage(event, callback) {
-        const searchedRecords = event.data ? event.data : [];
-        this.#threadSyncFlag += 1;
-        if (this.#threadSyncFlag === 1) {
-            this.#searchResult = [...searchedRecords];
-        } else {
-            this.#searchResult = [...this.#searchResult, ...searchedRecords];
-        }
-
-        // Check if all workers have finished
-        if (this.#threadSyncFlag === navigator.hardwareConcurrency) {
-            // Sort the search result based on the 'score' property (lower score means higher relevancy)
-            this.#searchResult.sort((a, b) => (a.flashScore || 1) - (b.flashScore || 1));
-
-            // Return the sorted result
-            callback(this.#searchResult);
-        }
+    #terminateAllWorkers() {
+        this.#activeWorkers.forEach(worker => {
+            worker.terminate();
+        });
+        this.#activeWorkers.clear();
+        this.#isSearching = false;
     }
 
     /**
      * Splits the input data into chunks, with each chunk being processed by a separate worker thread.
      * @param {Array} data - The input data to be processed.
+     * @param {number} workerCount - Number of workers to split data for.
      * @returns {Array} An array of arrays, where each sub-array represents a chunk of data.
      */
-    #chunkifyRecordsPerCore(data) {
+    #chunkifyRecordsPerCore(data, workerCount) {
         const recordsPerCore = [];
         let prevIdx = 0;
-        for (let core = 0; core < this.#workerPool.length; core++) {
+        for (let core = 0; core < workerCount; core++) {
             recordsPerCore.push(
                 data.slice(
                     prevIdx,
-                    prevIdx + Math.ceil(data.length / this.#workerPool.length)
+                    prevIdx + Math.ceil(data.length / workerCount)
                 )
             );
-            prevIdx += Math.ceil(data.length / this.#workerPool.length);
+            prevIdx += Math.ceil(data.length / workerCount);
         }
         return recordsPerCore;
     }
@@ -94,49 +67,68 @@ class FlashFind {
      * @returns {Array} An array of records that match the given query.
      */
     search(query) {
-        this.#threadSyncFlag = 0;
-        this.#searchResult = [];
+        // Prevent concurrent searches
+        if (this.#isSearching) {
+            return;
+        }
 
         // If query is an empty string, return dataSource as it is
         if (query?.trim() === '') {
-            this.#callback(this.#dataSource)
-            return
+            this.#callback(this.#dataSource);
+            return;
         }
 
-        const taskQueue = [];
+        this.#isSearching = true;
 
-        const isWorkerAvailable = () => {
-            return this.#workerPool.some((worker) => !worker.isBusy);
-        };
+        // Terminate any existing workers before starting new search
+        this.#terminateAllWorkers();
 
-        const executePendingTasks = () => {
-            while (taskQueue.length > 0 && isWorkerAvailable()) {
-                const task = taskQueue.shift();
-                executeTask(task);
-            }
-        };
+        const workerCount = navigator.hardwareConcurrency;
+        const dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource, workerCount);
 
-        const executeTask = ({ idx, workerThread }) => {
-            workerThread.isBusy = true;
+        let completedWorkers = 0;
+        let searchResults = [];
+
+        // Create workers on-demand for this search
+        for (let i = 0; i < workerCount; i++) {
+            const workerThread = new WebWorker(worker);
+            this.#activeWorkers.add(workerThread);
+
+            workerThread.addEventListener("message", (event) => {
+                const searchedRecords = event.data ? event.data : [];
+                searchResults = [...searchResults, ...searchedRecords];
+                completedWorkers++;
+
+                // Check if all workers have finished
+                if (completedWorkers === workerCount) {
+                    // Sort the search result based on the 'score' property (lower score means higher relevancy)
+                    searchResults.sort((a, b) => (a.flashScore || 1) - (b.flashScore || 1));
+
+                    // Return the sorted result
+                    this.#callback(searchResults);
+
+                    // Terminate all workers after search completes
+                    this.#terminateAllWorkers();
+                }
+            });
+
+            // Send work to the worker
             workerThread.postMessage({
-                record: this.#dataChunks[idx],
+                record: dataChunks[i],
                 searchText: `${query}`,
                 fuseConfig: this.fuseConfig
             });
-
-            workerThread.addEventListener("message", () => {
-                workerThread.isBusy = false;
-                executePendingTasks();
-            });
-        };
-
-        for (const [idx, workerThread] of this.#workerPool.entries()) {
-            if (isWorkerAvailable()) {
-                executeTask({ idx, workerThread });
-            } else {
-                taskQueue.push({ idx, workerThread });
-            }
         }
+    }
+
+    /**
+     * Cleanup method to terminate all workers and reset state.
+     * Call this when the FlashFind instance is no longer needed.
+     */
+    destroy() {
+        this.#terminateAllWorkers();
+        this.#callback = undefined;
+        this.#dataSource = null;
     }
 }
 
