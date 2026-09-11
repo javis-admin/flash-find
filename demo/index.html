@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FlashFind Demo</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --panel: #fff; --ink: #1a1a19; --muted: #6b6b68;
+    --line: #e4e4e1; --accent: #2563eb; --good: #16a34a; --warn: #d97706; --bad: #dc2626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17181a; --panel:#1f2023; --ink:#e8e8e6; --muted:#9a9a96;
+            --line:#31333700; --line:#313337; --accent:#60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:14px/1.55 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  h1 { font-size:18px; margin:0 0 2px; letter-spacing:-.01em; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .row { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; }
+  label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+          color:var(--muted); margin-bottom:5px; font-weight:600; }
+  select, input[type=search] { font:inherit; padding:8px 10px; border:1px solid var(--line);
+          border-radius:7px; background:var(--bg); color:var(--ink); }
+  input[type=search] { width:100%; font-size:16px; padding:11px 13px; }
+  button { font:inherit; font-weight:500; padding:8px 14px; border:1px solid var(--line);
+           border-radius:7px; background:var(--bg); color:var(--ink); cursor:pointer; }
+  button:hover { border-color:var(--accent); color:var(--accent); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; }
+  .stat { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .stat .k { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
+  .stat .v { font-size:20px; font-variant-numeric:tabular-nums; margin-top:2px; font-weight:600; }
+  /* The jank meter: a pure-CSS animation. It runs on the main thread's
+     rendering pipeline, so any long JS task freezes it visibly. */
+  .track { height:12px; background:var(--bg); border:1px solid var(--line);
+           border-radius:99px; overflow:hidden; position:relative; margin-top:10px; }
+  .runner { position:absolute; top:0; bottom:0; width:22%; border-radius:99px;
+            background:linear-gradient(90deg,transparent,var(--accent),transparent);
+            animation: slide 1.15s linear infinite; }
+  @keyframes slide { from { left:-22%; } to { left:100%; } }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.06em;
+       color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--line); font-weight:600; }
+  td { padding:6px 8px; border-bottom:1px solid var(--line); }
+  tr:last-child td { border-bottom:none; }
+  .score { font-variant-numeric:tabular-nums; color:var(--muted); }
+  .empty { color:var(--muted); padding:20px; text-align:center; }
+  .note { font-size:12px; color:var(--muted); margin-top:10px; }
+  .pill { display:inline-block; padding:1px 7px; border-radius:99px; font-size:11px; font-weight:600; }
+  .pill.ok { background:color-mix(in srgb,var(--good) 15%,transparent); color:var(--good); }
+  .pill.no { background:color-mix(in srgb,var(--bad) 15%,transparent); color:var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>FlashFind demo</h1>
+  <div class="sub">
+    Loads the real shipped <code>dist/bundle.js</code>. Type in the box and watch the
+    bar below — it stutters when the main thread is blocked.
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div>
+        <label for="size">Records</label>
+        <select id="size">
+          <option>20</option><option>100</option>
+          <option>1000</option><option selected>10000</option>
+          <option>50000</option><option>100000</option>
+        </select>
+      </div>
+      <div>
+        <label for="shape">Shape</label>
+        <select id="shape">
+          <option>narrow</option><option selected>typical</option><option>wide</option>
+        </select>
+      </div>
+      <div>
+        <label for="engine">Engine</label>
+        <select id="engine">
+          <option value="flashfind" selected>FlashFind (web workers)</option>
+          <option value="fuse">Fuse.js (main thread)</option>
+        </select>
+      </div>
+      <div><button id="reload">Rebuild dataset</button></div>
+      <div style="margin-left:auto"><span id="ready" class="pill no">loading…</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label for="q">Search</label>
+    <input id="q" type="search" placeholder="Try: Engineering, Priya Sharma, Enginnering (typo), zyxwvu…" autocomplete="off" />
+    <div class="track"><div class="runner"></div></div>
+    <div class="note">
+      Smooth bar = main thread free. Stuttering = blocked.
+      Switch the engine to <strong>Fuse.js (main thread)</strong> at 50k+ to feel the difference.
+      <em>Superseded</em> counts keystrokes the library collapsed while a search was running &mdash;
+      the last thing you type always returns.
+    </div>
+  </div>
+
+  <div class="panel stats">
+    <div class="stat"><div class="k">Frames / sec</div><div class="v" id="fps">–</div></div>
+    <div class="stat"><div class="k">Last search</div><div class="v" id="ms">–</div></div>
+    <div class="stat"><div class="k">Matches</div><div class="v" id="hits">–</div></div>
+    <div class="stat"><div class="k">Superseded</div><div class="v" id="dropped">0</div></div>
+    <div class="stat"><div class="k">Workers / search</div><div class="v" id="workers">–</div></div>
+  </div>
+
+  <div class="panel">
+    <div id="results"><div class="empty">Type above to search.</div></div>
+  </div>
+</div>
+
+<!-- The real shipped UMD artifact. Exposes window.FlashFind. -->
+<script src="/dist/bundle.js"></script>
+<!-- Fuse 6.4.6 for the main-thread comparison engine, matching the version
+     public/worker.js pulls from the CDN. -->
+<script src="/bench/vendor/fuse-6.4.6.min.js"></script>
+
+<script type="module">
+  // Reuse the benchmark's deterministic generator so the demo and the
+  // benchmark are looking at identical data.
+  import { generateDataset, keysForShape } from "/bench/datasets.js";
+
+  const $ = (id) => document.getElementById(id);
+  const MAX_ROWS = 50;   // cap DOM work so rendering never masks search cost
+
+  // Count real Worker constructions. The library scales worker count to the
+  // dataset size, so printing navigator.hardwareConcurrency would overstate it
+  // on small datasets. Patched before any search runs; FlashFind resolves the
+  // Worker global at call time, so this is observed, not assumed.
+  const NativeWorker = window.Worker;
+  let workersThisSearch = 0;
+  window.Worker = function PatchedWorker(...args) {
+    workersThisSearch++;
+    return new NativeWorker(...args);
+  };
+  window.Worker.prototype = NativeWorker.prototype;
+
+  let dataset = [], keys = [], engine = null, kind = "flashfind";
+  let issued = 0, delivered = 0, t0 = 0;
+
+  /* ---- jank meter: rAF frame counter ---- */
+  let frames = 0, lastTick = performance.now();
+  (function loop(now) {
+    frames++;
+    if (now - lastTick >= 500) {
+      const fps = Math.round((frames * 1000) / (now - lastTick));
+      const el = $("fps");
+      el.textContent = fps;
+      el.style.color = fps >= 50 ? "var(--good)" : fps >= 25 ? "var(--warn)" : "var(--bad)";
+      frames = 0; lastTick = now;
+    }
+    requestAnimationFrame(loop);
+  })(performance.now());
+
+  /* ---- Fuse options: mirror public/worker.js defaults, keys explicit ---- */
+  const optsFor = (k) => ({
+    threshold: 0.3, location: 0, distance: 100,
+    maxPatternLength: 32, includeScore: true, keys: k,
+  });
+
+  function render(rows) {
+    const box = $("results");
+    if (!rows.length) { box.innerHTML = '<div class="empty">No matches.</div>'; return; }
+    const shown = rows.slice(0, MAX_ROWS);
+    const cols = keys.filter((k) => k !== "description");
+    box.innerHTML =
+      "<table><thead><tr>" +
+      cols.map((c) => `<th>${c}</th>`).join("") +
+      "<th>score</th></tr></thead><tbody>" +
+      shown.map((r) =>
+        "<tr>" + cols.map((c) => `<td>${String(r[c] ?? "")}</td>`).join("") +
+        `<td class="score">${r.flashScore != null ? r.flashScore.toFixed(3) : "–"}</td></tr>`
+      ).join("") +
+      "</tbody></table>" +
+      (rows.length > MAX_ROWS
+        ? `<div class="note">Showing ${MAX_ROWS} of ${rows.length.toLocaleString()} — capped so DOM rendering doesn't skew the timing.</div>`
+        : "");
+  }
+
+  function teardown() {
+    if (kind === "flashfind" && engine?.destroy) engine.destroy();
+    engine = null;
+  }
+
+  function build() {
+    teardown();
+    const size = Number($("size").value);
+    const shape = $("shape").value;
+    kind = $("engine").value;
+
+    $("ready").className = "pill no";
+    $("ready").textContent = "building…";
+
+    // Defer so the "building…" paint lands before the blocking generate call.
+    setTimeout(() => {
+      dataset = generateDataset(size, shape);
+      keys = keysForShape(shape);
+
+      if (kind === "flashfind") {
+        engine = new window.FlashFind(dataset, optsFor(keys));
+        engine.init((results) => {
+          delivered++;
+          $("workers").textContent = workersThisSearch;
+          // Superseded = queries the library collapsed because a newer one
+          // arrived while they were in flight. Derived by counting, not
+          // assumed: the demo never withholds a query from the library.
+          $("dropped").textContent = Math.max(0, issued - delivered);
+          $("ms").textContent = (performance.now() - t0).toFixed(1) + " ms";
+          $("hits").textContent = (results?.length ?? 0).toLocaleString();
+          render(results || []);
+        });
+        $("workers").textContent = "–";
+      } else {
+        engine = new window.Fuse(dataset, optsFor(keys));   // index built once
+        $("workers").textContent = "0 (sync)";
+      }
+
+      issued = 0; delivered = 0; $("dropped").textContent = "0";
+      $("ready").className = "pill ok";
+      $("ready").textContent = `${size.toLocaleString()} rows ready`;
+      $("q").value = ""; render([]);
+      $("results").innerHTML = '<div class="empty">Type above to search.</div>';
+    }, 30);
+  }
+
+  function search(q) {
+    if (!engine) return;
+    if (q.trim() === "") {
+      $("ms").textContent = "–"; $("hits").textContent = "–";
+      $("results").innerHTML = '<div class="empty">Type above to search.</div>';
+      return;
+    }
+    t0 = performance.now();
+
+    if (kind === "flashfind") {
+      // Always dispatch. The library holds the latest query while one is in
+      // flight and runs it on completion, so mirroring that here would defeat
+      // the mechanism and miscount it.
+      issued++;
+      workersThisSearch = 0;
+      engine.search(q);
+    } else {
+      const res = engine.search(q).map((r) => Object.assign({}, r.item, { flashScore: r.score }));
+      $("ms").textContent = (performance.now() - t0).toFixed(1) + " ms";
+      $("hits").textContent = res.length.toLocaleString();
+      render(res);
+    }
+  }
+
+  $("q").addEventListener("input", (e) => search(e.target.value));
+  $("reload").addEventListener("click", build);
+  for (const id of ["size", "shape", "engine"]) $(id).addEventListener("change", build);
+
+  build();
+</script>
+</body>
+</html>
