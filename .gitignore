@@ -21,3 +21,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# benchmark run artifacts (keep the suite, not the outputs)
+/bench/results/*.json

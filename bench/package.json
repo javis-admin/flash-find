@@ -1,0 +1,4 @@
+{
+  "//": "Scopes the benchmark suite as ES modules. The root package.json cannot declare type:module because webpack.config.js is CommonJS.",
+  "type": "module"
+}

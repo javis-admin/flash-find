@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FlashFind Benchmark Runner</title>
+<style>
+  body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 2rem; max-width: 60rem; }
+  h1 { font-size: 1.2rem; }
+  #status { padding: .5rem .75rem; background: #f4f4f5; border-left: 3px solid #666; white-space: pre-wrap; }
+  #log { margin-top: 1rem; max-height: 24rem; overflow: auto; background: #fafafa; padding: .5rem; font-size: 12px; }
+  .done { border-left-color: #16a34a; }
+  .err  { border-left-color: #dc2626; }
+</style>
+</head>
+<body>
+  <h1>FlashFind Benchmark Runner</h1>
+  <div id="status">Idle. Waiting for driver, or click Run for a quick manual pass.</div>
+  <button id="run">Run (manual, small matrix)</button>
+  <button id="download" disabled>Download JSON</button>
+  <div id="log"></div>
+
+  <!-- FlashFind UMD bundle: the real shipping artifact, loaded unmodified. -->
+  <script src="/dist/bundle.js"></script>
+  <!-- Fuse for the main-thread baseline candidates. Pinned to 6.4.6 to match
+       the version the worker pulls from the CDN in production. -->
+  <script src="/bench/vendor/fuse-6.4.6.min.js"></script>
+
+  <script type="module">
+    import { runMatrix } from "/bench/harness.js";
+    // FlashFind from untranspiled ES source. See bench/flashfind-esm.js for
+    // why this is needed alongside the bundle.
+    import FlashFindESM from "/bench/flashfind-esm.js";
+    self.FlashFindESM = FlashFindESM;
+
+    const statusEl = document.getElementById("status");
+    const logEl = document.getElementById("log");
+    let lastResults = null;
+
+    function log(msg) {
+      logEl.textContent += msg + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setStatus(msg, cls = "") {
+      statusEl.textContent = msg;
+      statusEl.className = cls;
+    }
+
+    /**
+     * Entry point used by the Playwright driver. Exposed on window so the
+     * driver can invoke it with an arbitrary matrix config.
+     */
+    window.__runBenchmark = async function (cfg) {
+      setStatus("Running matrix...");
+      const results = await runMatrix(cfg, (p) => {
+        const wc = p.workerCount === null ? "-" : p.workerCount;
+        log(`${p.shape}/${p.size} ${p.candidateId} w=${wc} ${p.scenario}`);
+      });
+      lastResults = results;
+      setStatus("Done.", "done");
+      return results;
+    };
+
+    /** Sanity probe used by the driver to verify environment assumptions. */
+    window.__probe = function () {
+      return {
+        flashFindBundleLoaded: typeof self.FlashFind === "function",
+        flashFindEsmLoaded: typeof self.FlashFindESM === "function",
+        fuseLoaded: typeof self.Fuse === "function",
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        longTaskSupported:
+          typeof PerformanceObserver !== "undefined" &&
+          Array.isArray(PerformanceObserver.supportedEntryTypes) &&
+          PerformanceObserver.supportedEntryTypes.includes("longtask"),
+        userAgent: navigator.userAgent,
+      };
+    };
+
+    // Signals that the module has executed and the entry points above exist.
+    // The driver waits on this rather than racing module evaluation.
+    window.__benchReady = true;
+
+    document.getElementById("run").addEventListener("click", async () => {
+      try {
+        logEl.textContent = "";
+        const results = await window.__runBenchmark({
+          sizes: [1000, 10000],
+          shapes: ["typical"],
+          workerCounts: [4, 8],
+          candidateIds: ["flashfind", "fuse-sync-prebuilt"],
+          warmup: 2,
+          iterations: 5,
+          includeTyping: true,
+        });
+        document.getElementById("download").disabled = false;
+        log(`\n${results.length} result rows.`);
+      } catch (err) {
+        setStatus("Error: " + err.message, "err");
+        log(err.stack || String(err));
+      }
+    });
+
+    document.getElementById("download").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(lastResults, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "flashfind-bench.json";
+      a.click();
+    });
+  </script>
+</body>
+</html>

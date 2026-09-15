@@ -1,11 +1,23 @@
-import WebWorker from "./WebWorker";
-import worker from "../public/worker";
+import WebWorker from "./WebWorker.js";
+import worker from "../public/worker.js";
+
+/**
+ * Minimum records a worker must be given before spawning another one is worth
+ * it. Each worker costs a Worker construction, a Blob URL, an importScripts
+ * round-trip for Fuse, and a postMessage of its chunk in each direction -
+ * roughly 13ms of fixed overhead on a 10-core machine whether it searches
+ * 2 records or 2000. Below this threshold that overhead dominates the search
+ * itself, so we scale worker count to the data instead of always using every
+ * core.
+ */
+const MIN_RECORDS_PER_WORKER = 2000;
 
 class FlashFind {
     #dataSource = null;
     #callback = undefined;
     #activeWorkers = new Set();
     #isSearching = false;
+    #pendingQuery = null;
     fuseConfig = {}
 
     constructor(dataSource, fuseConfig = {}) {
@@ -21,12 +33,14 @@ class FlashFind {
         this.#callback = callback;
         // Clean up any existing workers
         this.#terminateAllWorkers();
+        this.#pendingQuery = null;
     }
 
     updateDataSource(dataSource) {
         this.#dataSource = dataSource;
         // Terminate any active workers when data source changes
         this.#terminateAllWorkers();
+        this.#pendingQuery = null;
     }
 
     /**
@@ -62,28 +76,62 @@ class FlashFind {
     }
 
     /**
+     * Decides how many workers to use for a given record count.
+     *
+     * Returns at least 1, never more than the number of cores, and otherwise
+     * one worker per MIN_RECORDS_PER_WORKER records. A 100-record dataset gets
+     * a single worker rather than ten mostly-empty ones.
+     *
+     * @param {number} recordCount
+     * @returns {number}
+     */
+    #workerCountFor(recordCount) {
+        const cores = navigator.hardwareConcurrency || 1;
+        const needed = Math.ceil(recordCount / MIN_RECORDS_PER_WORKER);
+        return Math.max(1, Math.min(cores, needed));
+    }
+
+    /**
      * Searches the input data for the given query.
+     *
+     * Results are delivered to the callback registered in init(); this returns
+     * nothing. If a search is already running, the query is held and run when
+     * that one finishes - only the most recent held query survives, so a fast
+     * typist collapses to one follow-up search rather than a queue of stale
+     * ones.
+     *
      * @param {String} query - The query to be searched.
-     * @returns {Array} An array of records that match the given query.
      */
     search(query) {
-        // Prevent concurrent searches
-        if (this.#isSearching) {
-            return;
-        }
-
-        // If query is an empty string, return dataSource as it is
+        // Empty query short-circuits to the full dataset without any worker.
         if (query?.trim() === '') {
+            this.#pendingQuery = null;
+            this.#terminateAllWorkers();
             this.#callback(this.#dataSource);
             return;
         }
 
+        // Supersede: keep only the latest query rather than tearing down the
+        // in-flight search (which loses its result) or discarding this one.
+        if (this.#isSearching) {
+            this.#pendingQuery = query;
+            return;
+        }
+
+        this.#dispatch(query);
+    }
+
+    /**
+     * Fans a query out across workers. Assumes no search is currently running.
+     * @param {String} query
+     */
+    #dispatch(query) {
+        // Order matters: #terminateAllWorkers() clears #isSearching, so the
+        // flag has to be raised after it, not before.
+        this.#terminateAllWorkers();
         this.#isSearching = true;
 
-        // Terminate any existing workers before starting new search
-        this.#terminateAllWorkers();
-
-        const workerCount = navigator.hardwareConcurrency;
+        const workerCount = this.#workerCountFor(this.#dataSource?.length ?? 0);
         const dataChunks = this.#chunkifyRecordsPerCore(this.#dataSource, workerCount);
 
         let completedWorkers = 0;
@@ -109,6 +157,9 @@ class FlashFind {
 
                     // Terminate all workers after search completes
                     this.#terminateAllWorkers();
+
+                    // Run whatever the user typed while this was in flight.
+                    this.#runPendingQuery();
                 }
             });
 
@@ -122,11 +173,22 @@ class FlashFind {
     }
 
     /**
+     * Runs the most recent query received while a search was in flight, if any.
+     */
+    #runPendingQuery() {
+        if (this.#pendingQuery === null) return;
+        const next = this.#pendingQuery;
+        this.#pendingQuery = null;
+        this.search(next);
+    }
+
+    /**
      * Cleanup method to terminate all workers and reset state.
      * Call this when the FlashFind instance is no longer needed.
      */
     destroy() {
         this.#terminateAllWorkers();
+        this.#pendingQuery = null;
         this.#callback = undefined;
         this.#dataSource = null;
     }
